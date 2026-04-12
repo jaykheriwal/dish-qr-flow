@@ -25,13 +25,14 @@ export default function RestaurantDashboard() {
 
   const restaurantId = sessionStorage.getItem('restaurantId');
   const restaurantName = sessionStorage.getItem('restaurantName');
-  if (!restaurantId) { navigate('/restaurant/login'); return null; }
 
-  const restaurant = useMemo(() => getRestaurants().find(r => r.id === restaurantId), [restaurantId]);
-  const orders = useMemo(() => getOrders().filter(o => o.restaurantId === restaurantId), [restaurantId]);
+  const restaurant = useMemo(() => restaurantId ? getRestaurants().find(r => r.id === restaurantId) : undefined, [restaurantId]);
+  const orders = useMemo(() => restaurantId ? getOrders().filter(o => o.restaurantId === restaurantId) : [], [restaurantId]);
   const customers = useMemo(() => getCustomers().slice(0, 100), []);
-  const [menuItems, setMenuItems] = useState(() => generateMenuForRestaurant(restaurantId));
+  const [menuItems, setMenuItems] = useState(() => restaurantId ? generateMenuForRestaurant(restaurantId) : []);
   const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
+
+  if (!restaurantId) { navigate('/restaurant/login'); return null; }
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   const statusOptions = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];

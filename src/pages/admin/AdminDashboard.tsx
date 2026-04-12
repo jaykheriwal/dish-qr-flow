@@ -23,16 +23,16 @@ export default function AdminDashboard() {
   const [showRegister, setShowRegister] = useState(false);
   const [regForm, setRegForm] = useState({ name: '', phone: '', gst: '', city: 'Bikaner' as 'Bikaner' | 'Jodhpur' });
 
+  const adminUser = sessionStorage.getItem('adminUser');
+
   const restaurants = useMemo(() => getRestaurants(), []);
   const orders = useMemo(() => getOrders(), []);
   const customers = useMemo(() => getCustomers(), []);
   const leads = useMemo(() => getLeads(), []);
 
-  const adminUser = sessionStorage.getItem('adminUser');
-  if (!adminUser) { navigate('/admin/login'); return null; }
-
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === new Date().toDateString());
+
+  if (!adminUser) { navigate('/admin/login'); return null; }
 
   // Analytics data
   const dailySales = useMemo(() => {
