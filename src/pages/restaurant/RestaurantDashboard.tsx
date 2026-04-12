@@ -32,8 +32,6 @@ export default function RestaurantDashboard() {
   const [menuItems, setMenuItems] = useState(() => restaurantId ? generateMenuForRestaurant(restaurantId) : []);
   const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
 
-  if (!restaurantId) { navigate('/restaurant/login'); return null; }
-
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   const statusOptions = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];
 
@@ -51,6 +49,8 @@ export default function RestaurantDashboard() {
     orders.forEach(o => o.items.forEach(it => map.set(it.name, (map.get(it.name) || 0) + it.quantity)));
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({ name, count }));
   }, [orders]);
+
+  if (!restaurantId) { navigate('/restaurant/login'); return null; }
 
   const updateOrderStatus = (orderId: string, status: string) => {
     setOrderStatuses(prev => ({ ...prev, [orderId]: status }));
