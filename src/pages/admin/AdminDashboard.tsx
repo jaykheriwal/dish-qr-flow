@@ -32,9 +32,6 @@ export default function AdminDashboard() {
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
-  if (!adminUser) { navigate('/admin/login'); return null; }
-
-  // Analytics data
   const dailySales = useMemo(() => {
     const map = new Map<string, number>();
     orders.slice(0, 500).forEach(o => {
@@ -55,6 +52,8 @@ export default function AdminDashboard() {
     const jod = restaurants.filter(r => r.city === 'Jodhpur').length;
     return [{ name: 'Bikaner', value: bik }, { name: 'Jodhpur', value: jod }];
   }, [restaurants]);
+
+  if (!adminUser) { navigate('/admin/login'); return null; }
 
   const filteredRestaurants = restaurants.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) || r.city.toLowerCase().includes(search.toLowerCase())
