@@ -315,17 +315,46 @@ export function generateReviews(): Review[] {
   ];
 }
 
-// Singleton data store
+// Singleton data store (mock data for demo admin1)
 let _restaurants: Restaurant[] | null = null;
 let _customers: Customer[] | null = null;
 let _orders: Order[] | null = null;
 let _leads: Lead[] | null = null;
+
+// Registered restaurants store (for live admin)
+let _registeredRestaurants: Restaurant[] = [];
+let _registeredOrders: Order[] = [];
 
 export function getRestaurants(): Restaurant[] {
   if (!_restaurants) _restaurants = generateRestaurants();
   return _restaurants;
 }
 export function setRestaurants(r: Restaurant[]) { _restaurants = r; }
+
+// Live registered restaurants (admin panel)
+export function getRegisteredRestaurants(): Restaurant[] {
+  return _registeredRestaurants;
+}
+export function addRegisteredRestaurant(r: Restaurant) {
+  _registeredRestaurants.push(r);
+}
+export function setRegisteredRestaurants(r: Restaurant[]) {
+  _registeredRestaurants = r;
+}
+
+// All restaurants (for customer QR lookup - checks both registered and mock)
+export function findRestaurantById(id: string): Restaurant | undefined {
+  return _registeredRestaurants.find(r => r.id === id) || getRestaurants().find(r => r.id === id);
+}
+
+// Live orders
+export function getRegisteredOrders(): Order[] {
+  return _registeredOrders;
+}
+export function addRegisteredOrder(order: Order) {
+  _registeredOrders.unshift(order);
+}
+
 export function getCustomers(): Customer[] {
   if (!_customers) _customers = generateCustomers();
   return _customers;
