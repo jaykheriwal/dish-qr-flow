@@ -11,8 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { QrCode, Store, ShoppingCart, Users, TrendingUp, LogOut, Search, MessageCircle, Plus, Eye, Power } from 'lucide-react';
-import { getRestaurants, setRestaurants, getOrders, getCustomers, getLeads, addLead, type Restaurant, type Lead } from '@/data/mockData';
+import { QrCode, Store, ShoppingCart, Users, TrendingUp, LogOut, Search, MessageCircle, Plus, Eye, Power, Trash2 } from 'lucide-react';
+import {
+  getRestaurants, setRestaurants, getOrders, getCustomers, getLeads, addLead,
+  getRegisteredRestaurants, addRegisteredRestaurant, setRegisteredRestaurants,
+  getRegisteredOrders, generateMenuForRestaurant,
+  type Restaurant, type Lead
+} from '@/data/mockData';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -23,16 +28,22 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false);
-  const [regForm, setRegForm] = useState({ name: '', phone: '', gst: '', city: 'Bikaner' as 'Bikaner' | 'Jodhpur' });
+  const [regForm, setRegForm] = useState({ name: '', phone: '', gst: '', city: 'Bikaner' as 'Bikaner' | 'Jodhpur', tables: '6' });
   const [showQRDialog, setShowQRDialog] = useState<Restaurant | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<number | null>(null);
   const [showOrdersDialog, setShowOrdersDialog] = useState<Restaurant | null>(null);
-  const [restaurantList, setRestaurantList] = useState(() => getRestaurants());
+  const [showMenuDialog, setShowMenuDialog] = useState<Restaurant | null>(null);
 
   const adminUser = sessionStorage.getItem('adminUser');
   const isDemoAdmin = adminUser === 'admin1';
 
-  const orders = useMemo(() => isDemoAdmin ? getOrders() : [], [isDemoAdmin]);
+  // Demo admin sees mock data, live admin sees only registered restaurants
+  const [mockRestaurantList, setMockRestaurantList] = useState(() => isDemoAdmin ? getRestaurants() : []);
+  const [registeredList, setRegisteredList] = useState(() => getRegisteredRestaurants());
+
+  const restaurantList = isDemoAdmin ? mockRestaurantList : registeredList;
+
+  const orders = useMemo(() => isDemoAdmin ? getOrders() : getRegisteredOrders(), [isDemoAdmin]);
   const customers = useMemo(() => isDemoAdmin ? getCustomers() : [], [isDemoAdmin]);
   const leads = useMemo(() => isDemoAdmin ? getLeads() : [], [isDemoAdmin]);
 
@@ -59,6 +70,9 @@ export default function AdminDashboard() {
     return [{ name: 'Bikaner', value: bik }, { name: 'Jodhpur', value: jod }];
   }, [restaurantList]);
 
+  // Menu state for admin menu viewing/deleting
+  const [menuItems, setMenuItems] = useState<ReturnType<typeof generateMenuForRestaurant>>([]);
+
   if (!adminUser) { navigate('/admin/login'); return null; }
 
   const filteredRestaurants = restaurantList.filter(r =>
@@ -67,23 +81,63 @@ export default function AdminDashboard() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success(`Restaurant "${regForm.name}" registered!`);
+    const newRest: Restaurant = {
+      id: `rest_reg_${Date.now()}`,
+      name: regForm.name,
+      phone: regForm.phone,
+      gst: regForm.gst || undefined,
+      city: regForm.city,
+      area: regForm.city === 'Bikaner' ? 'Station Road' : 'Sardarpura',
+      address: `${regForm.city}, Rajasthan`,
+      tables: parseInt(regForm.tables) || 6,
+      username: `rest_${Date.now()}`,
+      password: 'password123',
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
+    if (isDemoAdmin) {
+      const updated = [newRest, ...mockRestaurantList];
+      setMockRestaurantList(updated);
+      setRestaurants(updated);
+    } else {
+      addRegisteredRestaurant(newRest);
+      setRegisteredList([...getRegisteredRestaurants()]);
+    }
+
+    toast.success(`Restaurant "${regForm.name}" registered! Login: ${newRest.username} / password123`);
     setShowRegister(false);
-    setRegForm({ name: '', phone: '', gst: '', city: 'Bikaner' });
+    setRegForm({ name: '', phone: '', gst: '', city: 'Bikaner', tables: '6' });
   };
 
   const toggleRestaurantStatus = (restId: string) => {
-    const updated = restaurantList.map(r =>
-      r.id === restId ? { ...r, isActive: !r.isActive } : r
-    );
-    setRestaurantList(updated);
-    setRestaurants(updated);
-    const r = updated.find(r => r.id === restId);
-    toast.success(`${r?.name} ${r?.isActive ? 'activated' : 'deactivated'}`);
+    if (isDemoAdmin) {
+      const updated = mockRestaurantList.map(r => r.id === restId ? { ...r, isActive: !r.isActive } : r);
+      setMockRestaurantList(updated);
+      setRestaurants(updated);
+      const r = updated.find(r => r.id === restId);
+      toast.success(`${r?.name} ${r?.isActive ? 'activated' : 'deactivated'}`);
+    } else {
+      const updated = registeredList.map(r => r.id === restId ? { ...r, isActive: !r.isActive } : r);
+      setRegisteredList(updated);
+      setRegisteredRestaurants(updated);
+      const r = updated.find(r => r.id === restId);
+      toast.success(`${r?.name} ${r?.isActive ? 'activated' : 'deactivated'}`);
+    }
   };
 
   const getRestaurantOrders = (restId: string) => {
     return orders.filter(o => o.restaurantId === restId);
+  };
+
+  const openMenuDialog = (r: Restaurant) => {
+    setShowMenuDialog(r);
+    setMenuItems(generateMenuForRestaurant(r.id));
+  };
+
+  const deleteMenuItem = (itemId: string) => {
+    setMenuItems(prev => prev.filter(m => m.id !== itemId));
+    toast.success('Menu item deleted');
   };
 
   const baseUrl = window.location.origin;
@@ -108,7 +162,7 @@ export default function AdminDashboard() {
         {!isDemoAdmin && (
           <Card className="mb-6 border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
-              <p className="text-sm text-foreground">You're logged in as <strong>admin</strong> (live mode). Register restaurants, generate QR codes, and manage the platform. Login as <strong>admin1</strong> to see demo data with orders, customers, and analytics.</p>
+              <p className="text-sm text-foreground">You're logged in as <strong>admin</strong> (live mode). Register restaurants, generate QR codes, and manage the platform. Only real registered data will appear here. Login as <strong>admin1</strong> to see demo data.</p>
             </CardContent>
           </Card>
         )}
@@ -117,7 +171,7 @@ export default function AdminDashboard() {
           <TabsList className="mb-6 flex-wrap h-auto gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="restaurants">Restaurants</TabsTrigger>
-            {isDemoAdmin && <TabsTrigger value="orders">Orders</TabsTrigger>}
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             {isDemoAdmin && <TabsTrigger value="customers">Customers</TabsTrigger>}
             {isDemoAdmin && <TabsTrigger value="leads">Leads</TabsTrigger>}
             {isDemoAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
@@ -129,13 +183,8 @@ export default function AdminDashboard() {
               {[
                 { label: 'Restaurants', value: restaurantList.length, icon: Store, color: 'text-primary' },
                 { label: 'Active', value: restaurantList.filter(r => r.isActive).length, icon: Power, color: 'text-accent' },
-                ...(isDemoAdmin ? [
-                  { label: 'Total Orders', value: orders.length.toLocaleString(), icon: ShoppingCart, color: 'text-info' },
-                  { label: 'Revenue', value: `₹${(totalRevenue / 100000).toFixed(1)}L`, icon: TrendingUp, color: 'text-success' },
-                ] : [
-                  { label: 'Customers', value: '0', icon: Users, color: 'text-info' },
-                  { label: 'Revenue', value: '₹0', icon: TrendingUp, color: 'text-success' },
-                ]),
+                { label: 'Total Orders', value: orders.length.toLocaleString(), icon: ShoppingCart, color: 'text-info' },
+                { label: 'Revenue', value: totalRevenue > 0 ? `₹${(totalRevenue / 100000).toFixed(1)}L` : '₹0', icon: TrendingUp, color: 'text-success' },
               ].map((s) => (
                 <Card key={s.label}>
                   <CardContent className="pt-6">
@@ -151,7 +200,7 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {isDemoAdmin && (
+            {isDemoAdmin && dailySales.length > 0 && (
               <div className="grid md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader><CardTitle className="text-base">Daily Sales (Last 14 Days)</CardTitle></CardHeader>
@@ -182,6 +231,19 @@ export default function AdminDashboard() {
                 </Card>
               </div>
             )}
+
+            {!isDemoAdmin && restaurantList.length === 0 && (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Store className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground">No restaurants yet</h3>
+                  <p className="text-muted-foreground mt-1">Register your first restaurant to get started.</p>
+                  <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => { setTab('restaurants'); setShowRegister(true); }}>
+                    <Plus className="h-4 w-4 mr-1" /> Register Restaurant
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Restaurants */}
@@ -195,57 +257,73 @@ export default function AdminDashboard() {
                 <Plus className="h-4 w-4 mr-1" /> Register
               </Button>
             </div>
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>City</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Tables</TableHead>
-                        <TableHead>Login</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredRestaurants.slice(0, 25).map((r) => (
-                        <TableRow key={r.id} className={!r.isActive ? 'opacity-60' : ''}>
-                          <TableCell className="font-medium">{r.name}</TableCell>
-                          <TableCell>{r.city}</TableCell>
-                          <TableCell className="text-sm">{r.phone}</TableCell>
-                          <TableCell>{r.tables}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{r.username}</TableCell>
-                          <TableCell>
-                            <Switch checked={r.isActive} onCheckedChange={() => toggleRestaurantStatus(r.id)} />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => setShowQRDialog(r)} title="QR Codes">
-                                <QrCode className="h-4 w-4" />
-                              </Button>
-                              {isDemoAdmin && (
+            {filteredRestaurants.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <p className="text-muted-foreground">{!isDemoAdmin ? 'No restaurants registered yet. Click "Register" to add one.' : 'No restaurants match your search.'}</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>City</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Tables</TableHead>
+                          <TableHead>Login</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredRestaurants.slice(0, 25).map((r) => (
+                          <TableRow key={r.id} className={!r.isActive ? 'opacity-60' : ''}>
+                            <TableCell className="font-medium">{r.name}</TableCell>
+                            <TableCell>{r.city}</TableCell>
+                            <TableCell className="text-sm">{r.phone}</TableCell>
+                            <TableCell>{r.tables}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{r.username}</TableCell>
+                            <TableCell>
+                              <Switch checked={r.isActive} onCheckedChange={() => toggleRestaurantStatus(r.id)} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => setShowQRDialog(r)} title="QR Codes">
+                                  <QrCode className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="sm" onClick={() => setShowOrdersDialog(r)} title="View Orders">
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <p className="text-xs text-muted-foreground p-4">Showing 25 of {filteredRestaurants.length} restaurants</p>
-              </CardContent>
-            </Card>
+                                <Button variant="ghost" size="sm" onClick={() => openMenuDialog(r)} title="View Menu">
+                                  <Store className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground p-4">Showing {Math.min(25, filteredRestaurants.length)} of {filteredRestaurants.length} restaurants</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          {/* Orders (demo only) */}
-          {isDemoAdmin && (
-            <TabsContent value="orders">
+          {/* Orders */}
+          <TabsContent value="orders">
+            {orders.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No orders yet. Orders will appear here when customers place them.</p>
+                </CardContent>
+              </Card>
+            ) : (
               <Card>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -283,8 +361,8 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          )}
+            )}
+          </TabsContent>
 
           {/* Customers (demo only) */}
           {isDemoAdmin && (
@@ -412,6 +490,7 @@ export default function AdminDashboard() {
             <div><Label>Restaurant Name</Label><Input value={regForm.name} onChange={(e) => setRegForm({ ...regForm, name: e.target.value })} required /></div>
             <div><Label>Phone</Label><Input value={regForm.phone} onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })} required /></div>
             <div><Label>GST (Optional)</Label><Input value={regForm.gst} onChange={(e) => setRegForm({ ...regForm, gst: e.target.value })} /></div>
+            <div><Label>Number of Tables</Label><Input type="number" value={regForm.tables} onChange={(e) => setRegForm({ ...regForm, tables: e.target.value })} required min="1" /></div>
             <div>
               <Label>City</Label>
               <Select value={regForm.city} onValueChange={(v) => setRegForm({ ...regForm, city: v as 'Bikaner' | 'Jodhpur' })}>
@@ -464,7 +543,7 @@ export default function AdminDashboard() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Orders — {showOrdersDialog?.name}</DialogTitle>
-            <DialogDescription>{showOrdersDialog?.city} · {showOrdersDialog?.area}</DialogDescription>
+            <DialogDescription>{showOrdersDialog?.city}</DialogDescription>
           </DialogHeader>
           {showOrdersDialog && (
             <div className="max-h-[400px] overflow-y-auto">
@@ -500,6 +579,44 @@ export default function AdminDashboard() {
               })()}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Restaurant Menu Dialog */}
+      <Dialog open={showMenuDialog !== null} onOpenChange={() => setShowMenuDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Menu — {showMenuDialog?.name}</DialogTitle>
+            <DialogDescription>View and manage menu items</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Delete</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {menuItems.map(m => (
+                  <TableRow key={m.id} className={!m.isAvailable ? 'opacity-50' : ''}>
+                    <TableCell className="font-medium">{m.name}</TableCell>
+                    <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
+                    <TableCell>₹{m.price}</TableCell>
+                    <TableCell>{m.isAvailable ? 'Available' : 'Unavailable'}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => deleteMenuItem(m.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
