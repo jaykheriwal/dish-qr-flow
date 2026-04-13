@@ -6,8 +6,58 @@ const jodhpur_areas = ['Sardarpura', 'Ratanada', 'Paota', 'Shastri Nagar', 'Mand
 const firstNames = ['Rajesh', 'Suresh', 'Mahesh', 'Dinesh', 'Ramesh', 'Vikram', 'Ajay', 'Vijay', 'Sanjay', 'Deepak', 'Anil', 'Mohan', 'Gopal', 'Kishan', 'Ratan', 'Bharat', 'Neeraj', 'Pawan', 'Kailash', 'Lakshman', 'Pramod', 'Sunil', 'Mukesh', 'Yogesh', 'Harish', 'Ganesh', 'Naresh', 'Pradeep', 'Rakesh', 'Manish', 'Arvind', 'Ashok', 'Brij', 'Chandra', 'Dev', 'Firoz', 'Girish', 'Hemant', 'Indra', 'Jagdish'];
 const lastNames = ['Sharma', 'Agarwal', 'Joshi', 'Rathore', 'Vyas', 'Purohit', 'Soni', 'Gupta', 'Mathur', 'Pareek', 'Bissa', 'Kothari', 'Singhvi', 'Khandelwal', 'Bohra', 'Dadheech', 'Chouhan', 'Shekhawat', 'Ranawat', 'Paliwal'];
 
-const restaurantPrefixes = ['Royal', 'Shree', 'New', 'Maharaja', 'Rajputana', 'Desert', 'Golden', 'Grand', 'Classic', 'Imperial', 'Heritage', 'Shahi', 'Marwar', 'Jodhana', 'Bikaner', 'Thar', 'Rajasthani', 'Sagar', 'Palace', 'Krishna'];
-const restaurantSuffixes = ['Restaurant', 'Bhojnalaya', 'Dining', 'Kitchen', 'Food Court', 'Cafe', 'Dhaba', 'Thali House', 'Mess', 'Food Hub'];
+// More realistic restaurant names based on actual Rajasthan restaurant naming patterns
+const realRestaurantNames = [
+  'Sharma Bhojnalaya', 'Shree Laxmi Restaurant', 'Royal Rajputana Dining', 'Bikaner Sweets & Restaurant',
+  'Marwar Kitchen', 'Thar Desert Cafe', 'Jodhana Thali House', 'Palace View Restaurant',
+  'Shree Krishna Bhojnalaya', 'New Agra Sweet House', 'Sagar Ratna', 'Chotiwala Restaurant',
+  'Natraj Dining Hall', 'Ganesh Restaurant', 'Joshi Bhojnalaya', 'Gupta Vaishno Dhaba',
+  'Kailash Parbat', 'Surya Mahal Restaurant', 'Shahi Bhoj', 'Rajasthani Rasoi',
+  'Agarwal Bhojnalaya', 'Shiv Shakti Restaurant', 'Mahadev Dining', 'Bikaner Namkeen House',
+  'Heritage Haveli Restaurant', 'Papad Wala Dhaba', 'Bhairav Restaurant', 'Lalgarh Palace Cafe',
+  'Rathore Kitchen', 'Pareek Bhojnalaya', 'Om Restaurant', 'Mewar Dining',
+  'Chokhi Dhani Express', 'Rajwada Thali', 'Banna Restaurant', 'Mehrangarh View Cafe',
+  'Desert Pearl Restaurant', 'Singhvi Bhojnalaya', 'Kothari Dining Hall', 'Paliwal Restaurant',
+  'Golden Fork', 'Spice Junction', 'Dal Bati House', 'Gatte Ka Sabzi Corner',
+  'Ker Sangri Restaurant', 'Laal Maas Kitchen', 'Bajre Ki Roti House', 'Pyaaz Ki Kachori Shop',
+  'Mirchi Bada Corner', 'Raab Restaurant', 'Churma House', 'Ghevar Sweet House',
+  'Mawa Kachori Wala', 'Bikaneri Namkeen Corner', 'Jodhpuri Mirchi Wala', 'Makhaniya Lassi Shop',
+  'Shahi Samosa House', 'Rajasthani Thali Junction', 'Desi Ghee Restaurant', 'Tandoor Express',
+  'Roti Ghar', 'Sabji Mandi Restaurant', 'Paneer Palace', 'Dal Fry House',
+  'Chawal Ghar', 'Naan Stop', 'Biryani Blues Bikaner', 'Curry Point Jodhpur',
+  'Tadka Express', 'Masala Box', 'Thali Unlimited', 'Rasoi Ghar',
+  'Bhojan Griha', 'Anna Purna Restaurant', 'Maa Ka Dhaba', 'Ghar Ka Khana',
+  'Pakwan Palace', 'Zaika Restaurant', 'Swad Restaurant', 'Bhookh Mitao',
+  'Swaad Bhojnalaya', 'Khushboo Restaurant', 'Hungama Dhaba', 'Panchhi Cafe',
+  'Rang De Rajasthan', 'Haveli Restaurant', 'Bawarchi Restaurant', 'Dawat-E-Khas',
+  'Apna Dhaba', 'Sher-E-Punjab Jodhpur', 'South Point Dosa', 'Chinese Dragon Bikaner',
+  'Pizza Paradise Jodhpur', 'Burger Point Bikaner', 'Cafe Mehfil', 'Cafe Kulhad',
+  'Chai Sutta Bar', 'The Organic Kitchen', 'Green Leaf Veg', 'Fresh & Pure Restaurant',
+  'Uday Restaurant', 'Prakash Bhojnalaya', 'Basant Restaurant', 'Pushkar Restaurant',
+  'Ajmer Restaurant Bikaner', 'Mount Abu Dining', 'Jaisalmer Kitchen', 'Udaipur Express',
+  'Alwar Bhojnalaya', 'Kota Kitchen', 'Pali Restaurant', 'Barmer Dining Hall',
+  'Nagaur Kitchen', 'Churu Bhojnalaya', 'Sri Ganganagar Express', 'Hanumangarh Restaurant',
+  'Dungarpur Thali', 'Banswara Kitchen', 'Rajsamand Dining', 'Jhunjhunu Restaurant',
+  'Sikar Bhojnalaya', 'Tonk Kitchen', 'Bundi Restaurant', 'Bharatpur Dining',
+  'Sawai Madhopur Kitchen', 'Dholpur Restaurant', 'Karauli Bhojnalaya', 'Dausa Kitchen',
+  'Jhalawar Restaurant', 'Baran Dining', 'Sirohi Kitchen', 'Jalore Bhojnalaya',
+  'Bhilwara Restaurant', 'Chittorgarh Dining', 'Pratapgarh Kitchen', 'Neemuch Bhojnalaya',
+  'Mandsaur Restaurant', 'Ratlam Kitchen', 'Ujjain Express Jodhpur', 'Indore Bites Bikaner',
+  'Mathura Dining', 'Vrindavan Kitchen', 'Agra Express', 'Lucknow Biryani Point',
+  'Varanasi Thali', 'Patna Kitchen Bikaner', 'Ranchi Express Jodhpur', 'Bhopal Dining',
+  'Gwalior Restaurant', 'Jabalpur Kitchen', 'Sagar Express', 'Rewa Bhojnalaya',
+  'Satna Restaurant', 'Chhindwara Dining', 'Betul Kitchen', 'Hoshangabad Express',
+  'Vidisha Bhojnalaya', 'Rajgarh Kitchen', 'Shajapur Restaurant', 'Dewas Dining Hall',
+  'Dhar Kitchen', 'Jhabua Bhojnalaya', 'Alirajpur Express', 'Barwani Restaurant',
+  'Burhanpur Dining', 'Khandwa Kitchen', 'Khargone Bhojnalaya', 'Sendhwa Express',
+  'Mhow Restaurant', 'Pithampur Dining', 'Maheshwar Kitchen', 'Omkareshwar Cafe',
+  'Sanchi Express', 'Bhimbetka Restaurant', 'Orchha Kitchen', 'Khajuraho Dining',
+  'Mandla Bhojnalaya', 'Dindori Express', 'Shahdol Restaurant', 'Anuppur Kitchen',
+  'Katni Dining Hall', 'Panna Express', 'Tikamgarh Kitchen', 'Chhatarpur Bhojnalaya',
+  'Damoh Restaurant', 'Narsinghpur Dining', 'Seoni Kitchen', 'Balaghat Express',
+  'Gondia Restaurant', 'Bhandara Kitchen', 'Chandrapur Dining', 'Wardha Bhojnalaya',
+  'Amravati Express', 'Akola Restaurant', 'Washim Kitchen', 'Hingoli Dining',
+];
 
 export interface Restaurant {
   id: string;
@@ -94,17 +144,12 @@ function generateDate(daysBack: number): string {
   return d.toISOString();
 }
 
-// Generate restaurants
 export function generateRestaurants(): Restaurant[] {
   const restaurants: Restaurant[] = [];
-  const usedNames = new Set<string>();
   for (let i = 0; i < 210; i++) {
-    let name: string;
-    do {
-      name = `${rand(restaurantPrefixes)} ${rand(restaurantSuffixes)}`;
-      if (i > 50) name = `${rand(firstNames)}'s ${rand(restaurantSuffixes)}`;
-    } while (usedNames.has(name));
-    usedNames.add(name);
+    const name = i < realRestaurantNames.length
+      ? realRestaurantNames[i]
+      : `${rand(firstNames)}'s ${['Restaurant', 'Kitchen', 'Cafe', 'Dhaba', 'Dining'][randInt(0, 4)]}`;
 
     const city: 'Bikaner' | 'Jodhpur' = i % 2 === 0 ? 'Bikaner' : 'Jodhpur';
     const areas = city === 'Bikaner' ? bikaner_areas : jodhpur_areas;
@@ -129,7 +174,6 @@ export function generateRestaurants(): Restaurant[] {
 }
 
 const menuItems: { name: string; category: MenuItem['category']; price: number; desc: string; isVeg: boolean }[] = [
-  // Starters
   { name: 'Paneer Tikka', category: 'Starters', price: 220, desc: 'Marinated paneer grilled to perfection', isVeg: true },
   { name: 'Veg Manchurian', category: 'Starters', price: 180, desc: 'Crispy vegetable balls in tangy sauce', isVeg: true },
   { name: 'Samosa (2 pcs)', category: 'Starters', price: 60, desc: 'Crispy pastry filled with spiced potatoes', isVeg: true },
@@ -138,7 +182,6 @@ const menuItems: { name: string; category: MenuItem['category']; price: number; 
   { name: 'Spring Roll', category: 'Starters', price: 150, desc: 'Crispy rolls filled with vegetables', isVeg: true },
   { name: 'Papad (Roasted)', category: 'Starters', price: 40, desc: 'Crispy roasted papad with sides', isVeg: true },
   { name: 'Dahi Bhalla', category: 'Starters', price: 100, desc: 'Soft lentil dumplings in yogurt', isVeg: true },
-  // Main Course
   { name: 'Dal Makhani', category: 'Main Course', price: 250, desc: 'Slow-cooked black lentils in cream', isVeg: true },
   { name: 'Paneer Butter Masala', category: 'Main Course', price: 280, desc: 'Cottage cheese in rich tomato gravy', isVeg: true },
   { name: 'Rajma Chawal', category: 'Main Course', price: 180, desc: 'Kidney beans curry with steamed rice', isVeg: true },
@@ -151,7 +194,11 @@ const menuItems: { name: string; category: MenuItem['category']; price: number; 
   { name: 'Tandoori Roti', category: 'Main Course', price: 30, desc: 'Whole wheat bread from tandoor', isVeg: true },
   { name: 'Jeera Rice', category: 'Main Course', price: 120, desc: 'Basmati rice tempered with cumin', isVeg: true },
   { name: 'Dal Tadka', category: 'Main Course', price: 180, desc: 'Yellow lentils with aromatic tempering', isVeg: true },
-  // Beverages
+  { name: 'Dal Bati Churma', category: 'Main Course', price: 320, desc: 'Rajasthani classic with baked wheat balls', isVeg: true },
+  { name: 'Gatte Ka Sabzi', category: 'Main Course', price: 200, desc: 'Gram flour dumplings in spiced yogurt gravy', isVeg: true },
+  { name: 'Ker Sangri', category: 'Main Course', price: 240, desc: 'Traditional Rajasthani desert bean dish', isVeg: true },
+  { name: 'Laal Maas', category: 'Main Course', price: 380, desc: 'Fiery Rajasthani mutton curry', isVeg: false },
+  { name: 'Bajre Ki Roti', category: 'Main Course', price: 40, desc: 'Pearl millet flatbread', isVeg: true },
   { name: 'Masala Chai', category: 'Beverages', price: 30, desc: 'Traditional Indian spiced tea', isVeg: true },
   { name: 'Lassi (Sweet)', category: 'Beverages', price: 80, desc: 'Creamy yogurt-based sweet drink', isVeg: true },
   { name: 'Lassi (Salt)', category: 'Beverages', price: 70, desc: 'Refreshing salty yogurt drink', isVeg: true },
@@ -159,17 +206,20 @@ const menuItems: { name: string; category: MenuItem['category']; price: number; 
   { name: 'Mango Shake', category: 'Beverages', price: 120, desc: 'Thick mango milkshake', isVeg: true },
   { name: 'Buttermilk', category: 'Beverages', price: 50, desc: 'Spiced chilled buttermilk', isVeg: true },
   { name: 'Cold Coffee', category: 'Beverages', price: 100, desc: 'Chilled coffee with ice cream', isVeg: true },
-  // Desserts
+  { name: 'Makhaniya Lassi', category: 'Beverages', price: 90, desc: 'Rich creamy Jodhpuri special lassi', isVeg: true },
   { name: 'Gulab Jamun (2 pcs)', category: 'Desserts', price: 80, desc: 'Deep-fried milk solids in sugar syrup', isVeg: true },
   { name: 'Rasgulla (2 pcs)', category: 'Desserts', price: 80, desc: 'Soft cheese balls in sugar syrup', isVeg: true },
   { name: 'Ice Cream', category: 'Desserts', price: 100, desc: 'Creamy vanilla ice cream', isVeg: true },
   { name: 'Kulfi', category: 'Desserts', price: 80, desc: 'Traditional Indian frozen dessert', isVeg: true },
   { name: 'Jalebi', category: 'Desserts', price: 60, desc: 'Crispy sweet spirals soaked in syrup', isVeg: true },
   { name: 'Rasmalai (2 pcs)', category: 'Desserts', price: 100, desc: 'Soft paneer in sweetened milk', isVeg: true },
+  { name: 'Ghevar', category: 'Desserts', price: 120, desc: 'Rajasthani disc-shaped sweet cake', isVeg: true },
+  { name: 'Mawa Kachori', category: 'Desserts', price: 60, desc: 'Sweet stuffed pastry from Jodhpur', isVeg: true },
+  { name: 'Churma Ladoo', category: 'Desserts', price: 50, desc: 'Traditional Rajasthani wheat sweet', isVeg: true },
 ];
 
 export function generateMenuForRestaurant(restaurantId: string): MenuItem[] {
-  const count = randInt(12, menuItems.length);
+  const count = randInt(15, menuItems.length);
   const shuffled = [...menuItems].sort(() => Math.random() - 0.5).slice(0, count);
   return shuffled.map((item, i) => ({
     id: `${restaurantId}_menu_${i}`,
@@ -242,7 +292,7 @@ export function generateLeads(): Lead[] {
   for (let i = 0; i < 30; i++) {
     leads.push({
       id: `lead_${i + 1}`,
-      restaurantName: `${rand(restaurantPrefixes)} ${rand(restaurantSuffixes)}`,
+      restaurantName: realRestaurantNames[randInt(0, 50)],
       contactName: `${rand(firstNames)} ${rand(lastNames)}`,
       mobile: generatePhone(),
       createdAt: generateDate(30),
@@ -253,7 +303,7 @@ export function generateLeads(): Lead[] {
 }
 
 export function generateReviews(): Review[] {
-  const reviews: Review[] = [
+  return [
     { id: 'r1', name: 'R.K.', initials: 'RK', city: 'Bikaner', text: 'Increased our table turnover by 40%! Amazing system.', rating: 5 },
     { id: 'r2', name: 'S.S.', initials: 'SS', city: 'Jodhpur', text: 'Customers love the QR ordering! So convenient.', rating: 5 },
     { id: 'r3', name: 'M.A.', initials: 'MA', city: 'Bikaner', text: 'Very easy to manage menu and orders. Highly recommended.', rating: 4 },
@@ -263,7 +313,6 @@ export function generateReviews(): Review[] {
     { id: 'r7', name: 'P.J.', initials: 'PJ', city: 'Bikaner', text: 'Reduced order errors significantly. Very happy with the system.', rating: 5 },
     { id: 'r8', name: 'A.G.', initials: 'AG', city: 'Jodhpur', text: 'Professional system, great support team. 5 stars!', rating: 5 },
   ];
-  return reviews;
 }
 
 // Singleton data store
@@ -276,6 +325,7 @@ export function getRestaurants(): Restaurant[] {
   if (!_restaurants) _restaurants = generateRestaurants();
   return _restaurants;
 }
+export function setRestaurants(r: Restaurant[]) { _restaurants = r; }
 export function getCustomers(): Customer[] {
   if (!_customers) _customers = generateCustomers();
   return _customers;
