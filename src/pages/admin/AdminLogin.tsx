@@ -44,7 +44,10 @@ export default function AdminLogin() {
             </div>
             <Button type="submit" className="w-full gradient-primary text-primary-foreground">Sign In</Button>
           </form>
-          <p className="text-xs text-muted-foreground mt-4 text-center">Demo: admin / !@#$%^&*()</p>
+          <div className="text-xs text-muted-foreground mt-4 text-center space-y-1">
+            <p>Admin: admin / !@#$%^&*()</p>
+            <p>Demo (with data): admin1 / !@#$%^&*()</p>
+          </div>
         </CardContent>
       </Card>
     </div>
