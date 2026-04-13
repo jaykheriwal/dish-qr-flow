@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { QrCode, ShoppingCart, Plus, Minus, Trash2, ArrowLeft, CheckCircle, Clock, Flame, ChefHat } from 'lucide-react';
-import { getRestaurants, generateMenuForRestaurant } from '@/data/mockData';
+import { findRestaurantById, generateMenuForRestaurant } from '@/data/mockData';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -36,7 +36,7 @@ export default function CustomerOrder() {
   const [orderStatus, setOrderStatus] = useState<string>('Received');
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
-  const restaurant = useMemo(() => getRestaurants().find(r => r.id === restaurantId), [restaurantId]);
+  const restaurant = useMemo(() => restaurantId ? findRestaurantById(restaurantId) : undefined, [restaurantId]);
   const menuItems = useMemo(() => restaurantId ? generateMenuForRestaurant(restaurantId) : [], [restaurantId]);
 
   if (!restaurant) {

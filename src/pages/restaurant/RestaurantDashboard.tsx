@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { QrCode, LogOut, ShoppingCart, Users, TrendingUp, Download, Plus, MessageCircle, UtensilsCrossed } from 'lucide-react';
+import { QrCode, LogOut, ShoppingCart, Users, TrendingUp, Download, Plus, MessageCircle, UtensilsCrossed, Trash2 } from 'lucide-react';
 import { getRestaurants, getOrders, getCustomers, generateMenuForRestaurant } from '@/data/mockData';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
@@ -172,6 +172,7 @@ export default function RestaurantDashboard() {
                     <TableHead>Category</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Available</TableHead>
+                    <TableHead>Delete</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {menuItems.map((m) => (
@@ -180,6 +181,11 @@ export default function RestaurantDashboard() {
                         <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
                         <TableCell>₹{m.price}</TableCell>
                         <TableCell><Switch checked={m.isAvailable} onCheckedChange={() => toggleAvailability(m.id)} /></TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setMenuItems(prev => prev.filter(item => item.id !== m.id)); toast.success('Item deleted'); }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
