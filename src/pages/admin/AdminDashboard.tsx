@@ -524,16 +524,37 @@ export default function AdminDashboard() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
-              {showQRDialog && Array.from({ length: showQRDialog.tables }).map((_, i) => (
-                <Card key={i} className="text-center card-hover cursor-pointer" onClick={() => setSelectedQRTable(i + 1)}>
-                  <CardContent className="p-3">
-                    <QRCodeSVG value={`${baseUrl}/order/${showQRDialog.id}/${i + 1}`} size={60} className="mx-auto" />
-                    <p className="text-xs font-medium text-foreground mt-2">Table {i + 1}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[350px] overflow-y-auto">
+                {showQRDialog && Array.from({ length: showQRDialog.tables }).map((_, i) => (
+                  <Card key={i} className="text-center card-hover cursor-pointer" onClick={() => setSelectedQRTable(i + 1)}>
+                    <CardContent className="p-3">
+                      <QRCodeSVG value={`${baseUrl}/order/${showQRDialog.id}/${i + 1}`} size={60} className="mx-auto" />
+                      <p className="text-xs font-medium text-foreground mt-2">Table {i + 1}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full mt-2" onClick={() => {
+                if (!showQRDialog) return;
+                const addCount = parseInt(prompt('How many tables to add?') || '0', 10);
+                if (addCount <= 0) return;
+                const updated = { ...showQRDialog, tables: showQRDialog.tables + addCount };
+                if (isDemoAdmin) {
+                  const list = mockRestaurantList.map(r => r.id === updated.id ? updated : r);
+                  setMockRestaurantList(list);
+                  setRestaurants(list);
+                } else {
+                  const list = registeredList.map(r => r.id === updated.id ? updated : r);
+                  setRegisteredList(list);
+                  setRegisteredRestaurants(list);
+                }
+                setShowQRDialog(updated);
+                toast.success(`Added ${addCount} tables. Total: ${updated.tables}`);
+              }}>
+                <Plus className="h-4 w-4 mr-2" /> Add More Tables
+              </Button>
+            </>
           )}
         </DialogContent>
       </Dialog>
