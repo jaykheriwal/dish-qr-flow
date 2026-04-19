@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { QrCode, ShoppingCart, Plus, Minus, Trash2, ArrowLeft, CheckCircle, Clock, Flame, ChefHat } from 'lucide-react';
-import { findRestaurantById, generateMenuForRestaurant } from '@/data/mockData';
+import { QrCode, ShoppingCart, Plus, Minus, Trash2, CheckCircle, Clock, Flame, ChefHat } from 'lucide-react';
+import { findRestaurantById, getMenuForRestaurant, addOrder } from '@/store/localStore';
+import type { OrderStatus } from '@/types';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -18,12 +19,12 @@ interface CartItem {
   category: string;
 }
 
-const statusIcons: Record<string, any> = {
-  'Received': Clock,
-  'Preparing': ChefHat,
-  'Cooking': Flame,
-  'Prepared': CheckCircle,
-  'Completed': CheckCircle,
+const statusIcons: Record<OrderStatus, typeof Clock> = {
+  Received: Clock,
+  Preparing: ChefHat,
+  Cooking: Flame,
+  Prepared: CheckCircle,
+  Completed: CheckCircle,
 };
 
 export default function CustomerOrder() {
@@ -33,11 +34,20 @@ export default function CustomerOrder() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({ name: '', mobile: '', birthDay: '', birthMonth: '' });
   const [orderPlaced, setOrderPlaced] = useState(false);
-  const [orderStatus, setOrderStatus] = useState<string>('Received');
+  const [orderStatus, setOrderStatus] = useState<OrderStatus>('Received');
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
   const restaurant = useMemo(() => restaurantId ? findRestaurantById(restaurantId) : undefined, [restaurantId]);
-  const menuItems = useMemo(() => restaurantId ? generateMenuForRestaurant(restaurantId) : [], [restaurantId]);
+  const menuItems = useMemo(() => restaurantId ? getMenuForRestaurant(restaurantId) : [], [restaurantId]);
+
+  // Simulated frontend-only status progression (replace with real-time backend updates)
+  useEffect(() => {
+    if (!orderPlaced) return;
+    const t1 = setTimeout(() => setOrderStatus('Preparing'), 3000);
+    const t2 = setTimeout(() => setOrderStatus('Cooking'), 8000);
+    const t3 = setTimeout(() => setOrderStatus('Prepared'), 15000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [orderPlaced]);
 
   if (!restaurant) {
     return (
@@ -52,10 +62,10 @@ export default function CustomerOrder() {
     );
   }
 
-  const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category)))];
+  const categories: string[] = ['All', ...Array.from(new Set(menuItems.map(m => m.category)))];
   const filteredMenu = activeCategory === 'All' ? menuItems : menuItems.filter(m => m.category === activeCategory);
 
-  const addToCart = (item: typeof menuItems[0]) => {
+  const addToCart = (item: typeof menuItems[number]) => {
     if (!item.isAvailable) return;
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
@@ -78,13 +88,24 @@ export default function CustomerOrder() {
       toast.error('Please fill name and mobile');
       return;
     }
+    if (!restaurantId) return;
+    const orderId = `ord_${Date.now()}`;
+    addOrder({
+      id: orderId,
+      restaurantId,
+      tableNumber: parseInt(tableNumber || '1', 10),
+      customerId: `cust_${Date.now()}`,
+      customerName: customerInfo.name,
+      customerMobile: customerInfo.mobile,
+      items: cart.map(c => ({ menuItemId: c.id, name: c.name, quantity: c.quantity, price: c.price })),
+      total: cartTotal,
+      status: 'Received',
+      createdAt: new Date().toISOString(),
+    });
     setShowCheckout(false);
     setOrderPlaced(true);
+    setOrderStatus('Received');
     toast.success('Order placed successfully!');
-    // Simulate status updates
-    setTimeout(() => setOrderStatus('Preparing'), 3000);
-    setTimeout(() => setOrderStatus('Cooking'), 8000);
-    setTimeout(() => setOrderStatus('Prepared'), 15000);
   };
 
   if (orderPlaced) {
@@ -100,10 +121,9 @@ export default function CustomerOrder() {
             <p className="text-muted-foreground mt-2">Table {tableNumber} · {restaurant.name}</p>
           </div>
 
-          {/* Status Timeline */}
           <Card className="mb-6">
             <CardContent className="pt-6">
-              {['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'].map((s, i, arr) => {
+              {(['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'] as OrderStatus[]).map((s, i, arr) => {
                 const currentIdx = arr.indexOf(orderStatus);
                 const isComplete = i <= currentIdx;
                 const isCurrent = i === currentIdx;
@@ -119,7 +139,6 @@ export default function CustomerOrder() {
             </CardContent>
           </Card>
 
-          {/* Order Summary */}
           <Card>
             <CardContent className="pt-6">
               <h3 className="font-semibold text-foreground mb-3">Your Order</h3>
@@ -146,7 +165,6 @@ export default function CustomerOrder() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
       <div className="gradient-primary text-primary-foreground p-4 pb-6">
         <div className="max-w-md mx-auto">
           <div className="flex items-center gap-3">
@@ -176,44 +194,51 @@ export default function CustomerOrder() {
         </div>
 
         {/* Menu */}
-        <div className="space-y-3">
-          {filteredMenu.map((item) => {
-            const inCart = cart.find(c => c.id === item.id);
-            return (
-              <Card key={item.id} className={`overflow-hidden ${!item.isAvailable ? 'opacity-50' : ''}`}>
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-4 w-4 border-2 ${item.isVeg ? 'border-success' : 'border-destructive'} flex items-center justify-center`}>
-                        <div className={`h-2 w-2 rounded-full ${item.isVeg ? 'bg-success' : 'bg-destructive'}`} />
+        {menuItems.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <p className="text-muted-foreground">Menu is being set up. Please check back soon.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filteredMenu.map((item) => {
+              const inCart = cart.find(c => c.id === item.id);
+              return (
+                <Card key={item.id} className={`overflow-hidden ${!item.isAvailable ? 'opacity-50' : ''}`}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-4 w-4 border-2 ${item.isVeg ? 'border-success' : 'border-destructive'} flex items-center justify-center`}>
+                          <div className={`h-2 w-2 rounded-full ${item.isVeg ? 'bg-success' : 'bg-destructive'}`} />
+                        </div>
+                        <span className="font-medium text-foreground text-sm truncate">{item.name}</span>
                       </div>
-                      <span className="font-medium text-foreground text-sm truncate">{item.name}</span>
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>
+                      <p className="font-semibold text-foreground mt-1">₹{item.price}</p>
+                      {!item.isAvailable && <Badge variant="secondary" className="text-xs mt-1">Unavailable</Badge>}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>
-                    <p className="font-semibold text-foreground mt-1">₹{item.price}</p>
-                    {!item.isAvailable && <Badge variant="secondary" className="text-xs mt-1">Unavailable</Badge>}
-                  </div>
-                  <div className="ml-3">
-                    {inCart ? (
-                      <div className="flex items-center gap-2 bg-secondary rounded-lg p-1">
-                        <button onClick={() => updateQuantity(item.id, -1)} className="h-7 w-7 flex items-center justify-center rounded text-primary"><Minus className="h-4 w-4" /></button>
-                        <span className="text-sm font-medium text-foreground w-5 text-center">{inCart.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, 1)} className="h-7 w-7 flex items-center justify-center rounded text-primary"><Plus className="h-4 w-4" /></button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled={!item.isAvailable} onClick={() => addToCart(item)} className="text-primary border-primary">
-                        <Plus className="h-4 w-4 mr-1" /> Add
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    <div className="ml-3">
+                      {inCart ? (
+                        <div className="flex items-center gap-2 bg-secondary rounded-lg p-1">
+                          <button onClick={() => updateQuantity(item.id, -1)} className="h-7 w-7 flex items-center justify-center rounded text-primary"><Minus className="h-4 w-4" /></button>
+                          <span className="text-sm font-medium text-foreground w-5 text-center">{inCart.quantity}</span>
+                          <button onClick={() => updateQuantity(item.id, 1)} className="h-7 w-7 flex items-center justify-center rounded text-primary"><Plus className="h-4 w-4" /></button>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled={!item.isAvailable} onClick={() => addToCart(item)} className="text-primary border-primary">
+                          <Plus className="h-4 w-4 mr-1" /> Add
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Cart Bar */}
       {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 glass">
           <div className="max-w-md mx-auto">
@@ -226,7 +251,6 @@ export default function CustomerOrder() {
         </div>
       )}
 
-      {/* Checkout Dialog */}
       <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
         <DialogContent>
           <DialogHeader>

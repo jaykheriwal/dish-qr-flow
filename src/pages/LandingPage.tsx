@@ -5,11 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { generateReviews, addLead } from '@/data/mockData';
+import { reviews } from '@/data/reviews';
+import { addLead } from '@/store/localStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-const reviews = generateReviews();
 
 const features = [
   { icon: QrCode, title: 'QR Table Ordering', desc: 'Customers scan & order directly from their table. No app download needed.' },

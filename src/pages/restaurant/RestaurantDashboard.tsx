@@ -11,29 +11,39 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { QrCode, LogOut, ShoppingCart, Users, TrendingUp, Download, Plus, MessageCircle, UtensilsCrossed, Trash2 } from 'lucide-react';
-import { getRestaurants, getOrders, getCustomers, generateMenuForRestaurant } from '@/data/mockData';
+import { QrCode, LogOut, ShoppingCart, TrendingUp, Plus, MessageCircle, UtensilsCrossed, Trash2 } from 'lucide-react';
+import {
+  findRestaurantById,
+  getOrdersForRestaurant,
+  getMenuForRestaurant,
+  addMenuItem,
+  updateMenuItem,
+  deleteMenuItem as deleteMenuItemStore,
+  updateOrderStatus,
+} from '@/store/localStore';
+import type { MenuCategory, MenuItem, OrderStatus } from '@/types';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+
+const STATUS_OPTIONS: OrderStatus[] = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];
 
 export default function RestaurantDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('orders');
   const [showQR, setShowQR] = useState<number | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category: 'Starters', price: '' });
+  const [newItem, setNewItem] = useState<{ name: string; category: MenuCategory; price: string; isVeg: boolean }>({ name: '', category: 'Starters', price: '', isVeg: true });
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refresh = () => setRefreshTick(t => t + 1);
 
   const restaurantId = sessionStorage.getItem('restaurantId');
   const restaurantName = sessionStorage.getItem('restaurantName');
 
-  const restaurant = useMemo(() => restaurantId ? getRestaurants().find(r => r.id === restaurantId) : undefined, [restaurantId]);
-  const orders = useMemo(() => restaurantId ? getOrders().filter(o => o.restaurantId === restaurantId) : [], [restaurantId]);
-  const customers = useMemo(() => getCustomers().slice(0, 100), []);
-  const [menuItems, setMenuItems] = useState(() => restaurantId ? generateMenuForRestaurant(restaurantId) : []);
-  const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
+  const restaurant = useMemo(() => restaurantId ? findRestaurantById(restaurantId) : undefined, [restaurantId, refreshTick]);
+  const orders = useMemo(() => restaurantId ? getOrdersForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
+  const menuItems = useMemo<MenuItem[]>(() => restaurantId ? getMenuForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const statusOptions = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];
 
   const dailySales = useMemo(() => {
     const map = new Map<string, number>();
@@ -52,31 +62,40 @@ export default function RestaurantDashboard() {
 
   if (!restaurantId) { navigate('/restaurant/login'); return null; }
 
-  const updateOrderStatus = (orderId: string, status: string) => {
-    setOrderStatuses(prev => ({ ...prev, [orderId]: status }));
+  const handleStatusUpdate = (orderId: string, status: OrderStatus) => {
+    updateOrderStatus(orderId, status);
+    refresh();
     toast.success(`Order ${orderId} → ${status}`);
   };
 
-  const toggleAvailability = (itemId: string) => {
-    setMenuItems(prev => prev.map(m => m.id === itemId ? { ...m, isAvailable: !m.isAvailable } : m));
+  const toggleAvailability = (item: MenuItem) => {
+    updateMenuItem(restaurantId, item.id, { isAvailable: !item.isAvailable });
+    refresh();
   };
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
-    const item = {
-      id: `${restaurantId}_menu_new_${Date.now()}`,
+    if (!restaurantId) return;
+    addMenuItem({
+      id: `${restaurantId}_menu_${Date.now()}`,
       restaurantId,
       name: newItem.name,
-      category: newItem.category as any,
-      price: parseInt(newItem.price),
+      category: newItem.category,
+      price: parseInt(newItem.price, 10),
       description: '',
       isAvailable: true,
-      isVeg: true,
-    };
-    setMenuItems(prev => [...prev, item]);
+      isVeg: newItem.isVeg,
+    });
     setShowAddItem(false);
-    setNewItem({ name: '', category: 'Starters', price: '' });
+    setNewItem({ name: '', category: 'Starters', price: '', isVeg: true });
+    refresh();
     toast.success('Item added!');
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    deleteMenuItemStore(restaurantId, itemId);
+    refresh();
+    toast.success('Item deleted');
   };
 
   const baseUrl = window.location.origin;
@@ -96,7 +115,6 @@ export default function RestaurantDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Orders', value: orders.length, icon: ShoppingCart },
@@ -116,45 +134,51 @@ export default function RestaurantDashboard() {
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="menu">Menu</TabsTrigger>
             <TabsTrigger value="qr">QR Codes</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
           {/* Orders */}
           <TabsContent value="orders">
-            <Card><CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Table</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {orders.slice(0, 20).map((o) => (
-                      <TableRow key={o.id}>
-                        <TableCell className="font-mono text-xs">{o.id}</TableCell>
-                        <TableCell>T-{o.tableNumber}</TableCell>
-                        <TableCell>{o.customerName}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{o.items.map(i => `${i.name}×${i.quantity}`).join(', ')}</TableCell>
-                        <TableCell className="font-medium">₹{o.total}</TableCell>
-                        <TableCell><Badge variant={o.status === 'Completed' ? 'default' : 'secondary'}>{orderStatuses[o.id] || o.status}</Badge></TableCell>
-                        <TableCell>
-                          <Select value={orderStatuses[o.id] || o.status} onValueChange={(v) => updateOrderStatus(o.id, v)}>
-                            <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>{statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent></Card>
+            {orders.length === 0 ? (
+              <Card className="text-center py-12"><CardContent>
+                <ShoppingCart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No orders yet. Orders placed via QR will appear here.</p>
+              </CardContent></Card>
+            ) : (
+              <Card><CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Table</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {orders.slice(0, 50).map((o) => (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono text-xs">{o.id}</TableCell>
+                          <TableCell>T-{o.tableNumber}</TableCell>
+                          <TableCell>{o.customerName}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">{o.items.map(i => `${i.name}×${i.quantity}`).join(', ')}</TableCell>
+                          <TableCell className="font-medium">₹{o.total}</TableCell>
+                          <TableCell><Badge variant={o.status === 'Completed' ? 'default' : 'secondary'}>{o.status}</Badge></TableCell>
+                          <TableCell>
+                            <Select value={o.status} onValueChange={(v) => handleStatusUpdate(o.id, v as OrderStatus)}>
+                              <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>{STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent></Card>
+            )}
           </TabsContent>
 
           {/* Menu */}
@@ -164,34 +188,41 @@ export default function RestaurantDashboard() {
                 <Plus className="h-4 w-4 mr-1" /> Add Item
               </Button>
             </div>
-            <Card><CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Available</TableHead>
-                    <TableHead>Delete</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {menuItems.map((m) => (
-                      <TableRow key={m.id} className={!m.isAvailable ? 'opacity-50' : ''}>
-                        <TableCell className="font-medium">{m.name}</TableCell>
-                        <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
-                        <TableCell>₹{m.price}</TableCell>
-                        <TableCell><Switch checked={m.isAvailable} onCheckedChange={() => toggleAvailability(m.id)} /></TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setMenuItems(prev => prev.filter(item => item.id !== m.id)); toast.success('Item deleted'); }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent></Card>
+            {menuItems.length === 0 ? (
+              <Card className="text-center py-12"><CardContent>
+                <UtensilsCrossed className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No menu items yet. Click "Add Item" to start building your menu.</p>
+              </CardContent></Card>
+            ) : (
+              <Card><CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Available</TableHead>
+                      <TableHead>Delete</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {menuItems.map((m) => (
+                        <TableRow key={m.id} className={!m.isAvailable ? 'opacity-50' : ''}>
+                          <TableCell className="font-medium">{m.name}</TableCell>
+                          <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
+                          <TableCell>₹{m.price}</TableCell>
+                          <TableCell><Switch checked={m.isAvailable} onCheckedChange={() => toggleAvailability(m)} /></TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteItem(m.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent></Card>
+            )}
           </TabsContent>
 
           {/* QR Codes */}
@@ -207,39 +238,6 @@ export default function RestaurantDashboard() {
                 </Card>
               ))}
             </div>
-          </TabsContent>
-
-          {/* Customers */}
-          <TabsContent value="customers">
-            <div className="flex gap-3 mb-4">
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => toast.success('Broadcast sent!')}>
-                <MessageCircle className="h-4 w-4" /> Broadcast to All
-              </Button>
-            </div>
-            <Card><CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Mobile</TableHead>
-                    <TableHead>Orders</TableHead>
-                    <TableHead>Spent</TableHead>
-                    <TableHead>Tag</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {customers.slice(0, 25).map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{c.mobile}</TableCell>
-                        <TableCell>{c.orderCount}</TableCell>
-                        <TableCell>₹{c.totalSpent.toLocaleString()}</TableCell>
-                        <TableCell><Badge variant={c.tag === 'Frequent' ? 'default' : 'secondary'}>{c.tag}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent></Card>
           </TabsContent>
 
           {/* Analytics */}
@@ -308,7 +306,7 @@ export default function RestaurantDashboard() {
             <div><Label>Item Name</Label><Input value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} required /></div>
             <div>
               <Label>Category</Label>
-              <Select value={newItem.category} onValueChange={(v) => setNewItem({ ...newItem, category: v })}>
+              <Select value={newItem.category} onValueChange={(v) => setNewItem({ ...newItem, category: v as MenuCategory })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Starters">Starters</SelectItem>
@@ -319,6 +317,10 @@ export default function RestaurantDashboard() {
               </Select>
             </div>
             <div><Label>Price (₹)</Label><Input type="number" value={newItem.price} onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} required /></div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="isVeg">Vegetarian</Label>
+              <Switch id="isVeg" checked={newItem.isVeg} onCheckedChange={(v) => setNewItem({ ...newItem, isVeg: v })} />
+            </div>
             <Button type="submit" className="w-full gradient-primary text-primary-foreground">Add Item</Button>
           </form>
         </DialogContent>

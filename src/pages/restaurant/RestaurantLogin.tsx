@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { QrCode } from 'lucide-react';
 import { toast } from 'sonner';
-import { getRestaurants } from '@/data/mockData';
+import { findRestaurantByCredentials } from '@/store/localStore';
 
 export default function RestaurantLogin() {
   const [username, setUsername] = useState('');
@@ -15,9 +15,12 @@ export default function RestaurantLogin() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const restaurants = getRestaurants();
-    const rest = restaurants.find(r => r.username === username && r.password === password);
+    const rest = findRestaurantByCredentials(username, password);
     if (rest) {
+      if (!rest.isActive) {
+        toast.error('This restaurant account is deactivated. Contact admin.');
+        return;
+      }
       sessionStorage.setItem('restaurantId', rest.id);
       sessionStorage.setItem('restaurantName', rest.name);
       navigate('/restaurant/dashboard');
@@ -40,7 +43,7 @@ export default function RestaurantLogin() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <Label htmlFor="u">Username</Label>
-              <Input id="u" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="rest1" />
+              <Input id="u" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
             </div>
             <div>
               <Label htmlFor="p">Password</Label>
@@ -48,7 +51,9 @@ export default function RestaurantLogin() {
             </div>
             <Button type="submit" className="w-full gradient-primary text-primary-foreground">Sign In</Button>
           </form>
-          <p className="text-xs text-muted-foreground mt-4 text-center">Demo: rest1 / password123</p>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            Use the credentials provided by admin during registration.
+          </p>
         </CardContent>
       </Card>
     </div>
