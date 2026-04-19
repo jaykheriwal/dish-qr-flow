@@ -356,6 +356,15 @@ export default function RestaurantDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Scan-to-assign modal */}
+      <AssignmentModal
+        open={assignTable !== null}
+        tableNumber={assignTable}
+        restaurantId={restaurantId}
+        onClose={() => setAssignTable(null)}
+        onAssign={async (rId, table, qrId) => { await assignQR(rId, table, qrId); refresh(); }}
+      />
     </div>
   );
 }
