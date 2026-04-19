@@ -89,3 +89,49 @@
     @apply shadow-lg -translate-y-1;
   }
 }
+
+/* ============= Printable QR grid ============= */
+.printable-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+.qr-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--card));
+  break-inside: avoid;
+}
+.qr-label {
+  margin-top: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body * { visibility: hidden !important; }
+  .printable-grid, .printable-grid * { visibility: visible !important; }
+  .printable-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6mm;
+  }
+  .qr-cell {
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 6mm 2mm;
+  }
+  .qr-label { color: #333; font-size: 9px; }
+  .no-print { display: none !important; }
+  .page-break { break-after: page; page-break-after: always; }
+}

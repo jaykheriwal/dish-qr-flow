@@ -103,7 +103,7 @@ export default function AssignmentModal({ open, tableNumber, restaurantId, onClo
     })();
     return () => {
       cancelled = true;
-      stopScanner().then(() => { scannerRef.current?.clear().catch(() => {}); scannerRef.current = null; });
+      stopScanner().then(() => { try { scannerRef.current?.clear(); } catch { /* ignore */ } scannerRef.current = null; });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
