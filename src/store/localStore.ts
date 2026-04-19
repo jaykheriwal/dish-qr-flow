@@ -6,7 +6,7 @@
  * when wiring up your backend. The function signatures are stable.
  */
 
-import type { Restaurant, MenuItem, Order, Lead, PlanType } from '@/types';
+import type { Restaurant, MenuItem, Order, Lead, PlanType, QRCodeRecord } from '@/types';
 import { PLANS } from '@/types';
 
 const KEYS = {
@@ -14,6 +14,7 @@ const KEYS = {
   menus: 'qrserve.menus',           // map: restaurantId -> MenuItem[]
   orders: 'qrserve.orders',
   leads: 'qrserve.leads',
+  qrcodes: 'qrserve.qrcodes',
 };
 
 // ----- low-level persistence helpers -----

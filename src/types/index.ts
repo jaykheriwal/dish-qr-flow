@@ -93,6 +93,16 @@ export interface Lead {
   status: 'New' | 'Contacted' | 'Converted';
 }
 
+// A printed QR with a unique claim id, optionally assigned to a restaurant table.
+export interface QRCodeRecord {
+  id: string;                 // unique claim id (uuid)
+  batchId: string;            // grouping for a printed sheet/batch
+  createdAt: string;
+  assignedRestaurantId?: string;
+  assignedTableNumber?: number;
+  assignedAt?: string;
+}
+
 export interface Review {
   id: string;
   name: string;
