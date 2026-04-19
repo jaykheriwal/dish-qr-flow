@@ -10,42 +10,61 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { QrCode, Store, ShoppingCart, Users, TrendingUp, LogOut, Search, MessageCircle, Plus, Eye, Power, Trash2 } from 'lucide-react';
+import { QrCode, Store, ShoppingCart, TrendingUp, LogOut, Search, Plus, Eye, Power, Trash2, Users } from 'lucide-react';
 import {
-  getRestaurants, setRestaurants, getOrders, getCustomers, getLeads, addLead,
-  getRegisteredRestaurants, addRegisteredRestaurant, setRegisteredRestaurants,
-  getRegisteredOrders, generateMenuForRestaurant,
-  type Restaurant, type Lead
-} from '@/data/mockData';
+  getRestaurants,
+  addRestaurant,
+  updateRestaurant,
+  buildRestaurant,
+  getOrders,
+  getOrdersForRestaurant,
+  getMenuForRestaurant,
+  deleteMenuItem,
+  getLeads,
+  updateLeadStatus,
+} from '@/store/localStore';
+import { PLANS, type Restaurant, type PlanType, type City } from '@/types';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 
 const CHART_COLORS = ['hsl(220,70%,50%)', 'hsl(200,80%,55%)', 'hsl(168,60%,45%)', 'hsl(45,90%,50%)', 'hsl(280,60%,55%)'];
+
+interface RegisterForm {
+  name: string;
+  phone: string;
+  gst: string;
+  city: City;
+  tables: string;
+  username: string;
+  password: string;
+  plan: PlanType;
+}
+
+const EMPTY_FORM: RegisterForm = {
+  name: '', phone: '', gst: '', city: 'Bikaner', tables: '6',
+  username: '', password: '', plan: 'trial',
+};
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false);
-  const [regForm, setRegForm] = useState({ name: '', phone: '', gst: '', city: 'Bikaner' as 'Bikaner' | 'Jodhpur', tables: '6' });
+  const [regForm, setRegForm] = useState<RegisterForm>(EMPTY_FORM);
   const [showQRDialog, setShowQRDialog] = useState<Restaurant | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<number | null>(null);
   const [showOrdersDialog, setShowOrdersDialog] = useState<Restaurant | null>(null);
   const [showMenuDialog, setShowMenuDialog] = useState<Restaurant | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refresh = () => setRefreshTick(t => t + 1);
 
   const adminUser = sessionStorage.getItem('adminUser');
-  const isDemoAdmin = adminUser === 'admin1';
 
-  // Demo admin sees mock data, live admin sees only registered restaurants
-  const [mockRestaurantList, setMockRestaurantList] = useState(() => isDemoAdmin ? getRestaurants() : []);
-  const [registeredList, setRegisteredList] = useState(() => getRegisteredRestaurants());
-
-  const restaurantList = isDemoAdmin ? mockRestaurantList : registeredList;
-
-  const orders = useMemo(() => isDemoAdmin ? getOrders() : getRegisteredOrders(), [isDemoAdmin]);
-  const customers = useMemo(() => isDemoAdmin ? getCustomers() : [], [isDemoAdmin]);
-  const leads = useMemo(() => isDemoAdmin ? getLeads() : [], [isDemoAdmin]);
+  const restaurantList = useMemo(() => getRestaurants(), [refreshTick]);
+  const orders = useMemo(() => getOrders(), [refreshTick]);
+  const leads = useMemo(() => getLeads(), [refreshTick]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
@@ -70,8 +89,11 @@ export default function AdminDashboard() {
     return [{ name: 'Bikaner', value: bik }, { name: 'Jodhpur', value: jod }];
   }, [restaurantList]);
 
-  // Menu state for admin menu viewing/deleting
-  const [menuItems, setMenuItems] = useState<ReturnType<typeof generateMenuForRestaurant>>([]);
+  // Currently-shown menu (when admin opens a restaurant's menu dialog)
+  const adminMenuItems = useMemo(
+    () => showMenuDialog ? getMenuForRestaurant(showMenuDialog.id) : [],
+    [showMenuDialog, refreshTick],
+  );
 
   if (!adminUser) { navigate('/admin/login'); return null; }
 
@@ -81,62 +103,47 @@ export default function AdminDashboard() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    const newRest: Restaurant = {
-      id: `rest_reg_${Date.now()}`,
+    if (!regForm.username || !regForm.password) {
+      toast.error('Username and password are required');
+      return;
+    }
+    const newRest = buildRestaurant({
       name: regForm.name,
       phone: regForm.phone,
-      gst: regForm.gst || undefined,
+      gst: regForm.gst,
       city: regForm.city,
-      area: regForm.city === 'Bikaner' ? 'Station Road' : 'Sardarpura',
-      address: `${regForm.city}, Rajasthan`,
-      tables: parseInt(regForm.tables) || 6,
-      username: `rest_${Date.now()}`,
-      password: 'password123',
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
-    if (isDemoAdmin) {
-      const updated = [newRest, ...mockRestaurantList];
-      setMockRestaurantList(updated);
-      setRestaurants(updated);
-    } else {
-      addRegisteredRestaurant(newRest);
-      setRegisteredList([...getRegisteredRestaurants()]);
-    }
-
-    toast.success(`Restaurant "${regForm.name}" registered! Login: ${newRest.username} / password123`);
+      tables: parseInt(regForm.tables, 10) || 6,
+      username: regForm.username,
+      password: regForm.password,
+      plan: regForm.plan,
+    });
+    addRestaurant(newRest);
+    refresh();
+    const planLabel = PLANS[regForm.plan].label;
+    toast.success(`"${regForm.name}" registered on ${planLabel}. Login: ${newRest.username}`);
     setShowRegister(false);
-    setRegForm({ name: '', phone: '', gst: '', city: 'Bikaner', tables: '6' });
+    setRegForm(EMPTY_FORM);
   };
 
-  const toggleRestaurantStatus = (restId: string) => {
-    if (isDemoAdmin) {
-      const updated = mockRestaurantList.map(r => r.id === restId ? { ...r, isActive: !r.isActive } : r);
-      setMockRestaurantList(updated);
-      setRestaurants(updated);
-      const r = updated.find(r => r.id === restId);
-      toast.success(`${r?.name} ${r?.isActive ? 'activated' : 'deactivated'}`);
-    } else {
-      const updated = registeredList.map(r => r.id === restId ? { ...r, isActive: !r.isActive } : r);
-      setRegisteredList(updated);
-      setRegisteredRestaurants(updated);
-      const r = updated.find(r => r.id === restId);
-      toast.success(`${r?.name} ${r?.isActive ? 'activated' : 'deactivated'}`);
-    }
+  const toggleRestaurantStatus = (r: Restaurant) => {
+    const updated = updateRestaurant(r.id, { isActive: !r.isActive });
+    refresh();
+    toast.success(`${updated?.name} ${updated?.isActive ? 'activated' : 'deactivated'}`);
   };
 
-  const getRestaurantOrders = (restId: string) => {
-    return orders.filter(o => o.restaurantId === restId);
+  const addMoreTables = () => {
+    if (!showQRDialog) return;
+    const addCount = parseInt(prompt('How many tables to add?') || '0', 10);
+    if (addCount <= 0) return;
+    const updated = updateRestaurant(showQRDialog.id, { tables: showQRDialog.tables + addCount });
+    refresh();
+    if (updated) setShowQRDialog(updated);
+    toast.success(`Added ${addCount} tables. Total: ${updated?.tables}`);
   };
 
-  const openMenuDialog = (r: Restaurant) => {
-    setShowMenuDialog(r);
-    setMenuItems(generateMenuForRestaurant(r.id));
-  };
-
-  const deleteMenuItem = (itemId: string) => {
-    setMenuItems(prev => prev.filter(m => m.id !== itemId));
+  const handleDeleteMenuItem = (restaurantId: string, itemId: string) => {
+    deleteMenuItem(restaurantId, itemId);
+    refresh();
     toast.success('Menu item deleted');
   };
 
@@ -149,8 +156,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2">
             <QrCode className="h-6 w-6 text-primary" />
             <span className="font-bold text-foreground">QRServe Admin</span>
-            {isDemoAdmin && <Badge variant="secondary" className="text-xs">Demo</Badge>}
-            {!isDemoAdmin && <Badge variant="outline" className="text-xs">Live</Badge>}
+            <Badge variant="outline" className="text-xs">{adminUser}</Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={() => { sessionStorage.removeItem('adminUser'); navigate('/'); }}>
             <LogOut className="h-4 w-4 mr-1" /> Logout
@@ -159,22 +165,17 @@ export default function AdminDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {!isDemoAdmin && (
-          <Card className="mb-6 border-primary/20 bg-primary/5">
-            <CardContent className="pt-6">
-              <p className="text-sm text-foreground">You're logged in as <strong>admin</strong> (live mode). Register restaurants, generate QR codes, and manage the platform. Only real registered data will appear here. Login as <strong>admin1</strong> to see demo data.</p>
-            </CardContent>
-          </Card>
-        )}
-
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-6 flex-wrap h-auto gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="restaurants">Restaurants</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
-            {isDemoAdmin && <TabsTrigger value="customers">Customers</TabsTrigger>}
-            {isDemoAdmin && <TabsTrigger value="leads">Leads</TabsTrigger>}
-            {isDemoAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
+            <TabsTrigger value="leads">
+              Leads {leads.filter(l => l.status === 'New').length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{leads.filter(l => l.status === 'New').length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -200,20 +201,35 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {isDemoAdmin && dailySales.length > 0 && (
+            {restaurantList.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Store className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground">No restaurants yet</h3>
+                  <p className="text-muted-foreground mt-1">Register your first restaurant to get started.</p>
+                  <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => { setTab('restaurants'); setShowRegister(true); }}>
+                    <Plus className="h-4 w-4 mr-1" /> Register Restaurant
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
               <div className="grid md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader><CardTitle className="text-base">Daily Sales (Last 14 Days)</CardTitle></CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={dailySales}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,15%,90%)" />
-                        <XAxis dataKey="date" fontSize={11} tick={{ fill: 'hsl(220,10%,45%)' }} />
-                        <YAxis fontSize={11} tick={{ fill: 'hsl(220,10%,45%)' }} />
-                        <Tooltip />
-                        <Bar dataKey="amount" fill="hsl(220,70%,50%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {dailySales.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-12">No sales yet.</p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={dailySales}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,15%,90%)" />
+                          <XAxis dataKey="date" fontSize={11} tick={{ fill: 'hsl(220,10%,45%)' }} />
+                          <YAxis fontSize={11} tick={{ fill: 'hsl(220,10%,45%)' }} />
+                          <Tooltip />
+                          <Bar dataKey="amount" fill="hsl(220,70%,50%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
                   </CardContent>
                 </Card>
                 <Card>
@@ -231,19 +247,6 @@ export default function AdminDashboard() {
                 </Card>
               </div>
             )}
-
-            {!isDemoAdmin && restaurantList.length === 0 && (
-              <Card className="text-center py-12">
-                <CardContent>
-                  <Store className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-foreground">No restaurants yet</h3>
-                  <p className="text-muted-foreground mt-1">Register your first restaurant to get started.</p>
-                  <Button className="mt-4 gradient-primary text-primary-foreground" onClick={() => { setTab('restaurants'); setShowRegister(true); }}>
-                    <Plus className="h-4 w-4 mr-1" /> Register Restaurant
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Restaurants */}
@@ -260,7 +263,7 @@ export default function AdminDashboard() {
             {filteredRestaurants.length === 0 ? (
               <Card className="text-center py-12">
                 <CardContent>
-                  <p className="text-muted-foreground">{!isDemoAdmin ? 'No restaurants registered yet. Click "Register" to add one.' : 'No restaurants match your search.'}</p>
+                  <p className="text-muted-foreground">No restaurants registered yet. Click "Register" to add one.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -273,6 +276,7 @@ export default function AdminDashboard() {
                           <TableHead>Name</TableHead>
                           <TableHead>City</TableHead>
                           <TableHead>Phone</TableHead>
+                          <TableHead>Plan</TableHead>
                           <TableHead>Tables</TableHead>
                           <TableHead>Login</TableHead>
                           <TableHead>Status</TableHead>
@@ -280,15 +284,20 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredRestaurants.slice(0, 25).map((r) => (
+                        {filteredRestaurants.slice(0, 50).map((r) => (
                           <TableRow key={r.id} className={!r.isActive ? 'opacity-60' : ''}>
                             <TableCell className="font-medium">{r.name}</TableCell>
                             <TableCell>{r.city}</TableCell>
                             <TableCell className="text-sm">{r.phone}</TableCell>
+                            <TableCell>
+                              <Badge variant={r.plan === 'pro' ? 'default' : 'secondary'} className="text-xs">
+                                {r.plan === 'trial' ? 'Trial' : r.plan === 'basic' ? '₹999' : '₹1999'}
+                              </Badge>
+                            </TableCell>
                             <TableCell>{r.tables}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{r.username}</TableCell>
                             <TableCell>
-                              <Switch checked={r.isActive} onCheckedChange={() => toggleRestaurantStatus(r.id)} />
+                              <Switch checked={r.isActive} onCheckedChange={() => toggleRestaurantStatus(r)} />
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
@@ -298,7 +307,7 @@ export default function AdminDashboard() {
                                 <Button variant="ghost" size="sm" onClick={() => setShowOrdersDialog(r)} title="View Orders">
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => openMenuDialog(r)} title="View Menu">
+                                <Button variant="ghost" size="sm" onClick={() => setShowMenuDialog(r)} title="View Menu">
                                   <Store className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -308,7 +317,7 @@ export default function AdminDashboard() {
                       </TableBody>
                     </Table>
                   </div>
-                  <p className="text-xs text-muted-foreground p-4">Showing {Math.min(25, filteredRestaurants.length)} of {filteredRestaurants.length} restaurants</p>
+                  <p className="text-xs text-muted-foreground p-4">Showing {Math.min(50, filteredRestaurants.length)} of {filteredRestaurants.length} restaurants</p>
                 </CardContent>
               </Card>
             )}
@@ -340,7 +349,7 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {orders.slice(0, 30).map((o) => {
+                        {orders.slice(0, 50).map((o) => {
                           const rest = restaurantList.find(r => r.id === o.restaurantId);
                           return (
                             <TableRow key={o.id}>
@@ -364,52 +373,16 @@ export default function AdminDashboard() {
             )}
           </TabsContent>
 
-          {/* Customers (demo only) */}
-          {isDemoAdmin && (
-            <TabsContent value="customers">
-              <div className="flex gap-3 mb-4">
-                <Button variant="outline" size="sm" className="gap-1" onClick={() => toast.success('WhatsApp broadcast sent to all customers!')}>
-                  <MessageCircle className="h-4 w-4" /> Broadcast to All
-                </Button>
-              </div>
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Mobile</TableHead>
-                          <TableHead>Orders</TableHead>
-                          <TableHead>Spent</TableHead>
-                          <TableHead>Birthday</TableHead>
-                          <TableHead>Tag</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {customers.slice(0, 30).map((c) => (
-                          <TableRow key={c.id}>
-                            <TableCell className="font-medium">{c.name}</TableCell>
-                            <TableCell className="text-sm">{c.mobile}</TableCell>
-                            <TableCell>{c.orderCount}</TableCell>
-                            <TableCell>₹{c.totalSpent.toLocaleString()}</TableCell>
-                            <TableCell className="text-sm">{c.birthDay && c.birthMonth ? `${c.birthDay}/${c.birthMonth}` : '-'}</TableCell>
-                            <TableCell>
-                              <Badge variant={c.tag === 'Frequent' ? 'default' : 'secondary'}>{c.tag}</Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+          {/* Leads */}
+          <TabsContent value="leads">
+            {leads.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No leads yet. Demo requests from the landing page will show up here.</p>
                 </CardContent>
               </Card>
-            </TabsContent>
-          )}
-
-          {/* Leads (demo only) */}
-          {isDemoAdmin && (
-            <TabsContent value="leads">
+            ) : (
               <Card>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -421,6 +394,7 @@ export default function AdminDashboard() {
                           <TableHead>Mobile</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Date</TableHead>
+                          <TableHead>Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -431,6 +405,16 @@ export default function AdminDashboard() {
                             <TableCell>{l.mobile}</TableCell>
                             <TableCell><Badge variant={l.status === 'New' ? 'default' : 'secondary'}>{l.status}</Badge></TableCell>
                             <TableCell className="text-sm text-muted-foreground">{new Date(l.createdAt).toLocaleDateString('en-IN')}</TableCell>
+                            <TableCell>
+                              <Select value={l.status} onValueChange={(v) => { updateLeadStatus(l.id, v as 'New' | 'Contacted' | 'Converted'); refresh(); }}>
+                                <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="New">New</SelectItem>
+                                  <SelectItem value="Contacted">Contacted</SelectItem>
+                                  <SelectItem value="Converted">Converted</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -438,12 +422,18 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          )}
+            )}
+          </TabsContent>
 
-          {/* Analytics (demo only) */}
-          {isDemoAdmin && (
-            <TabsContent value="analytics">
+          {/* Analytics */}
+          <TabsContent value="analytics">
+            {orders.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <p className="text-muted-foreground">Analytics will appear once you have order data.</p>
+                </CardContent>
+              </Card>
+            ) : (
               <div className="grid md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader><CardTitle className="text-base">Most Ordered Items</CardTitle></CardHeader>
@@ -474,34 +464,70 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
-          )}
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
       {/* Register Restaurant Dialog */}
       <Dialog open={showRegister} onOpenChange={setShowRegister}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Register Restaurant</DialogTitle>
-            <DialogDescription>Add a new restaurant to the platform</DialogDescription>
+            <DialogDescription>Add a new restaurant and choose a plan</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleRegister} className="space-y-4">
             <div><Label>Restaurant Name</Label><Input value={regForm.name} onChange={(e) => setRegForm({ ...regForm, name: e.target.value })} required /></div>
             <div><Label>Phone</Label><Input value={regForm.phone} onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })} required /></div>
             <div><Label>GST (Optional)</Label><Input value={regForm.gst} onChange={(e) => setRegForm({ ...regForm, gst: e.target.value })} /></div>
-            <div><Label>Number of Tables</Label><Input type="number" value={regForm.tables} onChange={(e) => setRegForm({ ...regForm, tables: e.target.value })} required min="1" /></div>
-            <div>
-              <Label>City</Label>
-              <Select value={regForm.city} onValueChange={(v) => setRegForm({ ...regForm, city: v as 'Bikaner' | 'Jodhpur' })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Bikaner">Bikaner</SelectItem>
-                  <SelectItem value="Jodhpur">Jodhpur</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>City</Label>
+                <Select value={regForm.city} onValueChange={(v) => setRegForm({ ...regForm, city: v as City })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bikaner">Bikaner</SelectItem>
+                    <SelectItem value="Jodhpur">Jodhpur</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Number of Tables</Label><Input type="number" value={regForm.tables} onChange={(e) => setRegForm({ ...regForm, tables: e.target.value })} required min="1" /></div>
             </div>
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground">Register</Button>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Login Username</Label><Input value={regForm.username} onChange={(e) => setRegForm({ ...regForm, username: e.target.value })} required placeholder="rest_xyz" /></div>
+              <div><Label>Login Password</Label><Input value={regForm.password} onChange={(e) => setRegForm({ ...regForm, password: e.target.value })} required /></div>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Subscription Plan</Label>
+              <RadioGroup
+                value={regForm.plan}
+                onValueChange={(v) => setRegForm({ ...regForm, plan: v as PlanType })}
+                className="grid gap-2"
+              >
+                {(['trial', 'basic', 'pro'] as PlanType[]).map(p => {
+                  const plan = PLANS[p];
+                  return (
+                    <label key={p} htmlFor={`plan-${p}`} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${regForm.plan === p ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                      <RadioGroupItem value={p} id={`plan-${p}`} className="mt-1" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-foreground text-sm">{plan.label}</span>
+                          <span className="text-xs text-muted-foreground">{plan.durationDays} days</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {p === 'trial' && 'Full access, no payment required'}
+                          {p === 'basic' && 'Standard features for single outlet'}
+                          {p === 'pro' && 'All features + priority support'}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </RadioGroup>
+            </div>
+
+            <Button type="submit" className="w-full gradient-primary text-primary-foreground">Register on {PLANS[regForm.plan].label}</Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -535,23 +561,7 @@ export default function AdminDashboard() {
                   </Card>
                 ))}
               </div>
-              <Button variant="outline" className="w-full mt-2" onClick={() => {
-                if (!showQRDialog) return;
-                const addCount = parseInt(prompt('How many tables to add?') || '0', 10);
-                if (addCount <= 0) return;
-                const updated = { ...showQRDialog, tables: showQRDialog.tables + addCount };
-                if (isDemoAdmin) {
-                  const list = mockRestaurantList.map(r => r.id === updated.id ? updated : r);
-                  setMockRestaurantList(list);
-                  setRestaurants(list);
-                } else {
-                  const list = registeredList.map(r => r.id === updated.id ? updated : r);
-                  setRegisteredList(list);
-                  setRegisteredRestaurants(list);
-                }
-                setShowQRDialog(updated);
-                toast.success(`Added ${addCount} tables. Total: ${updated.tables}`);
-              }}>
+              <Button variant="outline" className="w-full mt-2" onClick={addMoreTables}>
                 <Plus className="h-4 w-4 mr-2" /> Add More Tables
               </Button>
             </>
@@ -566,40 +576,40 @@ export default function AdminDashboard() {
             <DialogTitle>Orders — {showOrdersDialog?.name}</DialogTitle>
             <DialogDescription>{showOrdersDialog?.city}</DialogDescription>
           </DialogHeader>
-          {showOrdersDialog && (
-            <div className="max-h-[400px] overflow-y-auto">
-              {(() => {
-                const restOrders = getRestaurantOrders(showOrdersDialog.id);
-                if (restOrders.length === 0) return <p className="text-sm text-muted-foreground py-4 text-center">No orders found for this restaurant.</p>;
-                return (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Table</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
+          {showOrdersDialog && (() => {
+            const restOrders = getOrdersForRestaurant(showOrdersDialog.id);
+            if (restOrders.length === 0) {
+              return <p className="text-sm text-muted-foreground py-4 text-center">No orders found for this restaurant.</p>;
+            }
+            return (
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Table</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {restOrders.slice(0, 30).map(o => (
+                      <TableRow key={o.id}>
+                        <TableCell className="font-mono text-xs">{o.id}</TableCell>
+                        <TableCell>T-{o.tableNumber}</TableCell>
+                        <TableCell>{o.customerName}</TableCell>
+                        <TableCell className="font-medium">₹{o.total}</TableCell>
+                        <TableCell><Badge variant={o.status === 'Completed' ? 'default' : 'secondary'}>{o.status}</Badge></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString('en-IN')}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {restOrders.slice(0, 20).map(o => (
-                        <TableRow key={o.id}>
-                          <TableCell className="font-mono text-xs">{o.id}</TableCell>
-                          <TableCell>T-{o.tableNumber}</TableCell>
-                          <TableCell>{o.customerName}</TableCell>
-                          <TableCell className="font-medium">₹{o.total}</TableCell>
-                          <TableCell><Badge variant={o.status === 'Completed' ? 'default' : 'secondary'}>{o.status}</Badge></TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString('en-IN')}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                );
-              })()}
-            </div>
-          )}
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -608,36 +618,40 @@ export default function AdminDashboard() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Menu — {showMenuDialog?.name}</DialogTitle>
-            <DialogDescription>View and manage menu items</DialogDescription>
+            <DialogDescription>View and remove menu items</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[400px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Delete</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {menuItems.map(m => (
-                  <TableRow key={m.id} className={!m.isAvailable ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{m.name}</TableCell>
-                    <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
-                    <TableCell>₹{m.price}</TableCell>
-                    <TableCell>{m.isAvailable ? 'Available' : 'Unavailable'}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => deleteMenuItem(m.id)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+          {showMenuDialog && adminMenuItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No menu items yet.</p>
+          ) : (
+            <div className="max-h-[400px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Delete</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {adminMenuItems.map(m => (
+                    <TableRow key={m.id} className={!m.isAvailable ? 'opacity-50' : ''}>
+                      <TableCell className="font-medium">{m.name}</TableCell>
+                      <TableCell><Badge variant="secondary">{m.category}</Badge></TableCell>
+                      <TableCell>₹{m.price}</TableCell>
+                      <TableCell>{m.isAvailable ? 'Available' : 'Unavailable'}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => showMenuDialog && handleDeleteMenuItem(showMenuDialog.id, m.id)} className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
