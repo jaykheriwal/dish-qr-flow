@@ -20,10 +20,13 @@ import {
   updateMenuItem,
   deleteMenuItem as deleteMenuItemStore,
   updateOrderStatus,
+  getAssignmentsForRestaurant,
+  assignQR,
 } from '@/store/localStore';
 import type { MenuCategory, MenuItem, OrderStatus } from '@/types';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+import AssignmentModal from '@/components/AssignmentModal';
 
 const STATUS_OPTIONS: OrderStatus[] = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];
 
@@ -33,6 +36,7 @@ export default function RestaurantDashboard() {
   const [showQR, setShowQR] = useState<number | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState<{ name: string; category: MenuCategory; price: string; isVeg: boolean }>({ name: '', category: 'Starters', price: '', isVeg: true });
+  const [assignTable, setAssignTable] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const refresh = () => setRefreshTick(t => t + 1);
 
@@ -42,6 +46,7 @@ export default function RestaurantDashboard() {
   const restaurant = useMemo(() => restaurantId ? findRestaurantById(restaurantId) : undefined, [restaurantId, refreshTick]);
   const orders = useMemo(() => restaurantId ? getOrdersForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
   const menuItems = useMemo<MenuItem[]>(() => restaurantId ? getMenuForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
+  const assignments = useMemo(() => restaurantId ? getAssignmentsForRestaurant(restaurantId) : {}, [restaurantId, refreshTick]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
@@ -227,16 +232,42 @@ export default function RestaurantDashboard() {
 
           {/* QR Codes */}
           <TabsContent value="qr">
+            <Card className="mb-4">
+              <CardContent className="pt-6 text-sm text-muted-foreground">
+                Each table can either use a unique URL QR (auto-generated below) or be linked to a printed claim QR via <strong className="text-foreground">"Assign QR"</strong> (camera scan).
+              </CardContent>
+            </Card>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {Array.from({ length: restaurant?.tables || 0 }).map((_, i) => (
-                <Card key={i} className="text-center card-hover cursor-pointer" onClick={() => setShowQR(i + 1)}>
-                  <CardContent className="pt-6">
-                    <QRCodeSVG value={`${baseUrl}/order/${restaurantId}/${i + 1}`} size={100} className="mx-auto" />
-                    <p className="mt-3 text-sm font-medium text-foreground">Table {i + 1}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Tap to enlarge</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {Array.from({ length: restaurant?.tables || 0 }).map((_, i) => {
+                const tableNo = i + 1;
+                const assigned = assignments[tableNo];
+                return (
+                  <Card key={tableNo} className="text-center card-hover">
+                    <CardContent className="pt-6">
+                      <div onClick={() => setShowQR(tableNo)} className="cursor-pointer">
+                        <QRCodeSVG value={`${baseUrl}/order/${restaurantId}/${tableNo}`} size={100} className="mx-auto" />
+                        <p className="mt-3 text-sm font-medium text-foreground">Table {tableNo}</p>
+                      </div>
+                      {assigned ? (
+                        <Badge variant="secondary" className="mt-2 text-[10px] font-mono">
+                          ✓ {assigned.id.slice(0, 6)}…
+                        </Badge>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">No claim QR linked</p>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => setAssignTable(tableNo)}
+                      >
+                        <QrCode className="h-3.5 w-3.5 mr-1" />
+                        {assigned ? 'Reassign' : 'Assign QR'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </TabsContent>
 
@@ -325,6 +356,15 @@ export default function RestaurantDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Scan-to-assign modal */}
+      <AssignmentModal
+        open={assignTable !== null}
+        tableNumber={assignTable}
+        restaurantId={restaurantId}
+        onClose={() => setAssignTable(null)}
+        onAssign={async (rId, table, qrId) => { await assignQR(rId, table, qrId); refresh(); }}
+      />
     </div>
   );
 }

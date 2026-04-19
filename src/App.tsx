@@ -9,6 +9,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import RestaurantLogin from "./pages/restaurant/RestaurantLogin";
 import RestaurantDashboard from "./pages/restaurant/RestaurantDashboard";
 import CustomerOrder from "./pages/customer/CustomerOrder";
+import Claim from "./pages/customer/Claim";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/restaurant/login" element={<RestaurantLogin />} />
           <Route path="/restaurant/dashboard" element={<RestaurantDashboard />} />
           <Route path="/order/:restaurantId/:tableNumber" element={<CustomerOrder />} />
+          <Route path="/claim/:qrId" element={<Claim />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

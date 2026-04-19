@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { QrCode, Store, ShoppingCart, TrendingUp, LogOut, Search, Plus, Eye, Power, Trash2, Users } from 'lucide-react';
+import { QrCode, Store, ShoppingCart, TrendingUp, LogOut, Search, Plus, Eye, Power, Trash2, Users, Sparkles } from 'lucide-react';
 import {
   getRestaurants,
   addRestaurant,
@@ -24,10 +24,13 @@ import {
   deleteMenuItem,
   getLeads,
   updateLeadStatus,
+  getQRCodes,
+  generateQRBatch,
 } from '@/store/localStore';
 import { PLANS, type Restaurant, type PlanType, type City } from '@/types';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+import QRGrid from '@/components/QRGrid';
 
 const CHART_COLORS = ['hsl(220,70%,50%)', 'hsl(200,80%,55%)', 'hsl(168,60%,45%)', 'hsl(45,90%,50%)', 'hsl(280,60%,55%)'];
 
@@ -65,6 +68,7 @@ export default function AdminDashboard() {
   const restaurantList = useMemo(() => getRestaurants(), [refreshTick]);
   const orders = useMemo(() => getOrders(), [refreshTick]);
   const leads = useMemo(() => getLeads(), [refreshTick]);
+  const qrCodes = useMemo(() => getQRCodes(), [refreshTick]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
@@ -175,6 +179,7 @@ export default function AdminDashboard() {
                 <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{leads.filter(l => l.status === 'New').length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="qrsheet">QR Sheet</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -423,6 +428,35 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Bulk QR Sheet — print claim QRs in batches */}
+          <TabsContent value="qrsheet">
+            <Card className="mb-4 no-print">
+              <CardContent className="pt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" /> Bulk QR Generator
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Generate a batch of unique claim QRs to print and stick on tables.
+                    Restaurants link each printed QR to a table from their dashboard.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {[20, 40, 100].map(n => (
+                    <Button
+                      key={n}
+                      variant="outline"
+                      onClick={() => { generateQRBatch(n); refresh(); toast.success(`Generated ${n} new QR codes`); }}
+                    >
+                      +{n}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <QRGrid codes={qrCodes} title={`All QR Codes (${qrCodes.length})`} />
           </TabsContent>
 
           {/* Analytics */}

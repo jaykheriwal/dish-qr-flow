@@ -6,7 +6,7 @@
  * when wiring up your backend. The function signatures are stable.
  */
 
-import type { Restaurant, MenuItem, Order, Lead, PlanType } from '@/types';
+import type { Restaurant, MenuItem, Order, Lead, PlanType, QRCodeRecord } from '@/types';
 import { PLANS } from '@/types';
 
 const KEYS = {
@@ -14,6 +14,7 @@ const KEYS = {
   menus: 'qrserve.menus',           // map: restaurantId -> MenuItem[]
   orders: 'qrserve.orders',
   leads: 'qrserve.leads',
+  qrcodes: 'qrserve.qrcodes',
 };
 
 // ----- low-level persistence helpers -----
@@ -154,4 +155,66 @@ export function addLead(input: { restaurantName: string; contactName: string; mo
 export function updateLeadStatus(id: string, status: Lead['status']) {
   const list = getLeads().map(l => l.id === id ? { ...l, status } : l);
   write(KEYS.leads, list);
+}
+
+// ----- QR Codes (printable claim QRs) -----
+export function getQRCodes(): QRCodeRecord[] {
+  return read<QRCodeRecord[]>(KEYS.qrcodes, []);
+}
+function writeQRCodes(list: QRCodeRecord[]) {
+  write(KEYS.qrcodes, list);
+}
+export function findQRCode(id: string): QRCodeRecord | undefined {
+  return getQRCodes().find(q => q.id === id);
+}
+export function generateQRBatch(count: number): QRCodeRecord[] {
+  const batchId = `batch_${Date.now()}`;
+  const now = new Date().toISOString();
+  const newCodes: QRCodeRecord[] = Array.from({ length: count }).map(() => ({
+    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `qr_${Math.random().toString(36).slice(2)}_${Date.now()}`,
+    batchId,
+    createdAt: now,
+  }));
+  writeQRCodes([...newCodes, ...getQRCodes()]);
+  return newCodes;
+}
+/** Mock backend: assign a claim QR to a table. Replace with real API call later. */
+export async function assignQR(restaurantId: string, tableNumber: number, qrId: string): Promise<QRCodeRecord> {
+  const list = getQRCodes();
+  const existing = list.find(q => q.id === qrId);
+  if (!existing) {
+    // accept unknown ids too — register on the fly so external printed QRs still work
+    const created: QRCodeRecord = {
+      id: qrId,
+      batchId: 'external',
+      createdAt: new Date().toISOString(),
+      assignedRestaurantId: restaurantId,
+      assignedTableNumber: tableNumber,
+      assignedAt: new Date().toISOString(),
+    };
+    writeQRCodes([created, ...list]);
+    return created;
+  }
+  // unassign any other QR currently on this table
+  const cleared = list.map(q =>
+    q.assignedRestaurantId === restaurantId && q.assignedTableNumber === tableNumber && q.id !== qrId
+      ? { ...q, assignedRestaurantId: undefined, assignedTableNumber: undefined, assignedAt: undefined }
+      : q
+  );
+  const updated = cleared.map(q =>
+    q.id === qrId
+      ? { ...q, assignedRestaurantId: restaurantId, assignedTableNumber: tableNumber, assignedAt: new Date().toISOString() }
+      : q
+  );
+  writeQRCodes(updated);
+  return updated.find(q => q.id === qrId)!;
+}
+export function getAssignmentsForRestaurant(restaurantId: string): Record<number, QRCodeRecord> {
+  const map: Record<number, QRCodeRecord> = {};
+  getQRCodes().forEach(q => {
+    if (q.assignedRestaurantId === restaurantId && q.assignedTableNumber != null) {
+      map[q.assignedTableNumber] = q;
+    }
+  });
+  return map;
 }
