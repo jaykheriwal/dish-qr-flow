@@ -20,10 +20,13 @@ import {
   updateMenuItem,
   deleteMenuItem as deleteMenuItemStore,
   updateOrderStatus,
+  getAssignmentsForRestaurant,
+  assignQR,
 } from '@/store/localStore';
 import type { MenuCategory, MenuItem, OrderStatus } from '@/types';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+import AssignmentModal from '@/components/AssignmentModal';
 
 const STATUS_OPTIONS: OrderStatus[] = ['Received', 'Preparing', 'Cooking', 'Prepared', 'Completed'];
 
@@ -33,6 +36,7 @@ export default function RestaurantDashboard() {
   const [showQR, setShowQR] = useState<number | null>(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState<{ name: string; category: MenuCategory; price: string; isVeg: boolean }>({ name: '', category: 'Starters', price: '', isVeg: true });
+  const [assignTable, setAssignTable] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const refresh = () => setRefreshTick(t => t + 1);
 
@@ -42,6 +46,7 @@ export default function RestaurantDashboard() {
   const restaurant = useMemo(() => restaurantId ? findRestaurantById(restaurantId) : undefined, [restaurantId, refreshTick]);
   const orders = useMemo(() => restaurantId ? getOrdersForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
   const menuItems = useMemo<MenuItem[]>(() => restaurantId ? getMenuForRestaurant(restaurantId) : [], [restaurantId, refreshTick]);
+  const assignments = useMemo(() => restaurantId ? getAssignmentsForRestaurant(restaurantId) : {}, [restaurantId, refreshTick]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
 
