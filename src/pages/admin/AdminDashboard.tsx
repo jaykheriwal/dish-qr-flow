@@ -430,6 +430,35 @@ export default function AdminDashboard() {
             )}
           </TabsContent>
 
+          {/* Bulk QR Sheet — print claim QRs in batches */}
+          <TabsContent value="qrsheet">
+            <Card className="mb-4 no-print">
+              <CardContent className="pt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" /> Bulk QR Generator
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Generate a batch of unique claim QRs to print and stick on tables.
+                    Restaurants link each printed QR to a table from their dashboard.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {[20, 40, 100].map(n => (
+                    <Button
+                      key={n}
+                      variant="outline"
+                      onClick={() => { generateQRBatch(n); refresh(); toast.success(`Generated ${n} new QR codes`); }}
+                    >
+                      +{n}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <QRGrid codes={qrCodes} title={`All QR Codes (${qrCodes.length})`} />
+          </TabsContent>
+
           {/* Analytics */}
           <TabsContent value="analytics">
             {orders.length === 0 ? (
